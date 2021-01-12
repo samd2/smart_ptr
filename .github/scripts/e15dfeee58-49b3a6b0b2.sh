@@ -2,16 +2,15 @@
 
 set -ex
 export TRAVIS_BUILD_DIR=$(pwd)
-export TRAVIS_BRANCH=$DRONE_BRANCH
-export TRAVIS_OS_NAME=${DRONE_JOB_OS_NAME:-linux}
-export VCS_COMMIT_ID=$DRONE_COMMIT
-export GIT_COMMIT=$DRONE_COMMIT
-export DRONE_CURRENT_BUILD_DIR=$(pwd)
+export TRAVIS_BRANCH=${TRAVIS_BRANCH:-$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')}
+export VCS_COMMIT_ID=$GITHUB_SHA
+export GIT_COMMIT=$GITHUB_SHA
+export REPO_NAME=$(basename $GITHUB_REPOSITORY)
 export PATH=~/.local/bin:/usr/local/bin:$PATH
 
 echo '==================================> BEFORE_INSTALL'
 
-. .drone/before-install.sh
+. .github/scripts/before-install.sh
 
 echo '==================================> INSTALL'
 
@@ -45,14 +44,19 @@ cp -r $TRAVIS_BUILD_DIR/* libs/smart_ptr
 
 echo '==================================> BEFORE_SCRIPT'
 
-. $DRONE_CURRENT_BUILD_DIR/.drone/before-script.sh
+. $GITHUB_WORKSPACE/.github/scripts/before-script.sh
 
 echo '==================================> SCRIPT'
 
+pip install --user cmake
 mkdir __build__ && cd __build__
-cmake -DBOOST_ENABLE_CMAKE=1 -DBoost_VERBOSE=1 -DBOOST_INCLUDE_LIBRARIES=smart_ptr -DBUILD_TESTING=ON ..
-ctest --output-on-failure -R boost_smart_ptr
+cmake -DBOOST_ENABLE_CMAKE=1 -DBoost_VERBOSE=1 -DBOOST_INCLUDE_LIBRARIES=smart_ptr -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX=~/.local ..
+cmake --build . --target install
+cd ../libs/smart_ptr/test/cmake_install_test && mkdir __build__ && cd __build__
+cmake -DCMAKE_INSTALL_PREFIX=~/.local ..
+cmake --build .
+cmake --build . --target check
 
 echo '==================================> AFTER_SUCCESS'
 
-. $DRONE_CURRENT_BUILD_DIR/.drone/after-success.sh
+. $GITHUB_WORKSPACE/.github/scripts/after-success.sh

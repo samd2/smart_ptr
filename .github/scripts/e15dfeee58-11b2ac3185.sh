@@ -2,16 +2,15 @@
 
 set -ex
 export TRAVIS_BUILD_DIR=$(pwd)
-export TRAVIS_BRANCH=$DRONE_BRANCH
-export TRAVIS_OS_NAME=${DRONE_JOB_OS_NAME:-linux}
-export VCS_COMMIT_ID=$DRONE_COMMIT
-export GIT_COMMIT=$DRONE_COMMIT
-export DRONE_CURRENT_BUILD_DIR=$(pwd)
+export TRAVIS_BRANCH=${TRAVIS_BRANCH:-$(echo $GITHUB_REF | awk 'BEGIN { FS = "/" } ; { print $3 }')}
+export VCS_COMMIT_ID=$GITHUB_SHA
+export GIT_COMMIT=$GITHUB_SHA
+export REPO_NAME=$(basename $GITHUB_REPOSITORY)
 export PATH=~/.local/bin:/usr/local/bin:$PATH
 
 echo '==================================> BEFORE_INSTALL'
 
-. .drone/before-install.sh
+. .github/scripts/before-install.sh
 
 echo '==================================> INSTALL'
 
@@ -45,13 +44,15 @@ cp -r $TRAVIS_BUILD_DIR/* libs/smart_ptr
 
 echo '==================================> BEFORE_SCRIPT'
 
-. $DRONE_CURRENT_BUILD_DIR/.drone/before-script.sh
+. $GITHUB_WORKSPACE/.github/scripts/before-script.sh
 
 echo '==================================> SCRIPT'
 
-echo "using $TOOLSET : : $COMPILER ;" > ~/user-config.jam
-./b2 -j3 libs/smart_ptr/test toolset=$TOOLSET cxxstd=$CXXSTD variant=debug,release ${UBSAN:+cxxflags=-fsanitize=undefined cxxflags=-fno-sanitize-recover=undefined linkflags=-fsanitize=undefined debug-symbols=on} ${LINKFLAGS:+linkflags=$LINKFLAGS}
+cd libs/smart_ptr/test/cmake_subdir_test && mkdir __build__ && cd __build__
+cmake ..
+cmake --build .
+cmake --build . --target check
 
 echo '==================================> AFTER_SUCCESS'
 
-. $DRONE_CURRENT_BUILD_DIR/.drone/after-success.sh
+. $GITHUB_WORKSPACE/.github/scripts/after-success.sh
